@@ -1,0 +1,49 @@
+﻿@page "/"
+@using BlazorServerRdlc.Data;
+@using Microsoft.EntityFrameworkCore;
+@inject IDbContextFactory<ReportDbContext> ContextFactory
+
+<PageTitle>Index</PageTitle>
+
+<h1>Hello, report!</h1>
+
+@if(Persons is null)
+{
+    <div>
+        Loading...
+    </div>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Name</th>
+                <th>Last Name</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var person in Persons)
+            {
+                <tr>
+                    <td>@person.Id</td>
+                    <td>@person.Name</td>
+                    <td>@person.LastName</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code
+{
+    private Person[] Persons { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = ContextFactory.CreateDbContext();
+
+        Persons = await context.Persons.ToArrayAsync();
+    }
+}
