@@ -1,0 +1,118 @@
+﻿@page "/add-person"
+@using BlazorServerRdlc.Data
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.EntityFrameworkCore;
+@inject IDbContextFactory<ReportDbContext> ContextFactory
+@inject NavigationManager Navigation
+@inject IConfiguration Configuration
+
+<h3>Add Person</h3>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <div style="color:red;">Greška: @error</div>
+}
+
+<EditForm Model="@person" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+
+    <div class="form-group">
+    <label for="name">Name:</label>
+    <InputText id="name" class="form-control" @bind-Value="person.Name"  />
+    <ValidationMessage For="@(() => person.Name)" />
+</div>
+
+<div class="form-group">
+    <label for="lastName">Last Name:</label>
+    <InputText id="lastName" class="form-control" @bind-Value="person.LastName"  />
+    <ValidationMessage For="@(() => person.LastName)" />
+</div>
+
+    <div class="form-group">
+        <label for="attachment">Attachment:</label>
+        <InputFile id="attachment" class="form-control" OnChange="HandleFileSelected" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save</button>
+</EditForm>
+
+@code {
+    private Person person = new();
+    private IBrowserFile file;
+    private string error;
+
+    private async Task HandleValidSubmit()
+    {
+        using var context = ContextFactory.CreateDbContext();
+        using var transaction = context.Database.BeginTransaction();
+
+        try
+        {
+            // Validate the user details
+            // ...
+
+            if (file != null)
+            {
+                // Validate the file type
+                var allowedContentTypes = new[] { "image/jpeg", "image/jpg", "image/png", "application/pdf" };
+                if (!allowedContentTypes.Contains(file.ContentType))
+                {
+                    error = "Nedozvoljena vrsta datoteke! Dozvoljene vrste datoteka su: jpeg, png i pdf.";
+                    return;
+                }
+            }
+
+            // Save the new person to the database
+            context.Persons.Add(person);
+            await context.SaveChangesAsync();
+
+            if (file != null)
+            {
+                // Read the physical path from the appSettings.json file
+                var physicalPath = Configuration["AttachmentsPhysicalPath"];
+
+                // Build the directory path using the physical path and person ID
+                var directoryPath = Path.Combine(physicalPath, person.Id.ToString());
+
+                // Create the directory if it does not already exist
+                Directory.CreateDirectory(directoryPath);
+
+                // Build the file path using the directory path and file name
+                var filePath = Path.Combine(directoryPath, file.Name);
+
+                // Save the file to disk and create a new Attachment object
+                //var filePath = $"d:\\att\\{file.Name}";
+                var maxFileSize = 1024 * 1024 * 1024; //1MB
+                using var stream = System.IO.File.Create(filePath);
+                using var fileStream = file.OpenReadStream(maxFileSize);
+                await fileStream.CopyToAsync(stream);
+
+                var attachment = new Attachment
+                    {
+                        PersonId = person.Id,
+                        FilePath = filePath
+                    };
+
+                context.Attachments.Add(attachment);
+                await context.SaveChangesAsync();
+            }
+
+            // Commit the transaction if there were no errors
+            await transaction.CommitAsync();
+
+            Navigation.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            // Rollback the transaction if there were any errors
+            await transaction.RollbackAsync();
+
+            error = ex.Message;
+        }
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        file = e.File;
+    }
+}

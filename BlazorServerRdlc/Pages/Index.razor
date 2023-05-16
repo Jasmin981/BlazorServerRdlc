@@ -1,13 +1,13 @@
 ﻿@page "/"
-@using BlazorServerRdlc.Data;
-@using Microsoft.EntityFrameworkCore;
+@using BlazorServerRdlc.Data
+@using Microsoft.EntityFrameworkCore
 @inject IDbContextFactory<ReportDbContext> ContextFactory
 
 <PageTitle>Index</PageTitle>
 
 <h1>Hello, report!</h1>
 
-@if(Persons is null)
+@if (Persons is null)
 {
     <div>
         Loading...
@@ -21,6 +21,7 @@ else
                 <th>Id</th>
                 <th>Name</th>
                 <th>Last Name</th>
+                <th>Attachments</th>
             </tr>
         </thead>
         <tbody>
@@ -30,20 +31,32 @@ else
                     <td>@person.Id</td>
                     <td>@person.Name</td>
                     <td>@person.LastName</td>
+                    <td>
+                        @if (person.Attachments.Any())
+                        {
+                            @foreach (var attachment in person.Attachments)
+                            {
+                                <div>@System.IO.Path.GetFileName(attachment.FilePath)</div>
+                            }
+                        }
+                        else
+                        {
+                            <div>No</div>
+                        }
+                    </td>
                 </tr>
             }
         </tbody>
     </table>
 }
 
-@code
-{
+@code {
     private Person[] Persons { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
         using var context = ContextFactory.CreateDbContext();
 
-        Persons = await context.Persons.ToArrayAsync();
+        Persons = await context.Persons.Include(p => p.Attachments).ToArrayAsync();
     }
 }
