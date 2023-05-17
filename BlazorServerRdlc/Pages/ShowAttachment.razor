@@ -1,0 +1,32 @@
+﻿@page "/att/{PersonId:int}/{FileName}"
+@using BlazorServerRdlc.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ReportDbContext> ContextFactory
+@inject NavigationManager Navigation
+
+<div>hello @PersonId and @FileName</div>
+
+@code {
+    [Parameter]
+    public int PersonId { get; set; }
+
+    [Parameter]
+    public string FileName { get; set; }
+
+    private Attachment attachment;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        using var context = ContextFactory.CreateDbContext();
+        attachment = await context.Attachments
+            .Where(a => a.PersonId == PersonId && Path.GetFileName(a.FilePath) == FileName)
+            .FirstOrDefaultAsync();
+        if (attachment == null)
+        {
+            Navigation.NavigateTo("/404");
+            return;
+        }
+
+        // Display the attachment or trigger a file download
+    }
+}
