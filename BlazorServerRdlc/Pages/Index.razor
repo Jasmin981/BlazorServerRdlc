@@ -36,7 +36,7 @@ else
                         {
                             @foreach (var attachment in person.Attachments)
                             {
-                                <div>@System.IO.Path.GetFileName(attachment.FilePath)</div>
+                                <div><a href="download/@attachment.FilePath">@System.IO.Path.GetFileName(attachment.FilePath)</a></div>
                             }
                         }
                         else

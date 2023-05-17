@@ -15,104 +15,78 @@
 
 <EditForm Model="@person" OnValidSubmit="HandleValidSubmit">
     <DataAnnotationsValidator />
-
     <div class="form-group">
-    <label for="name">Name:</label>
-    <InputText id="name" class="form-control" @bind-Value="person.Name"  />
-    <ValidationMessage For="@(() => person.Name)" />
-</div>
-
-<div class="form-group">
-    <label for="lastName">Last Name:</label>
-    <InputText id="lastName" class="form-control" @bind-Value="person.LastName"  />
-    <ValidationMessage For="@(() => person.LastName)" />
-</div>
-
+        <label for="name">Name:</label>
+        <InputText id="name" class="form-control" @bind-Value="person.Name" />
+        <ValidationMessage For="@(() => person.Name)" />
+    </div>
+    <div class="form-group">
+        <label for="lastName">Last Name:</label>
+        <InputText id="lastName" class="form-control" @bind-Value="person.LastName" />
+        <ValidationMessage For="@(() => person.LastName)" />
+    </div>
     <div class="form-group">
         <label for="attachment">Attachment:</label>
-        <InputFile id="attachment" class="form-control" OnChange="HandleFileSelected" />
+        <InputFile id="attachment" class="form-control" OnChange="HandleFileSelected" multiple />
     </div>
-
     <button type="submit" class="btn btn-primary">Save</button>
 </EditForm>
 
 @code {
     private Person person = new();
-    private IBrowserFile file;
+    private List<IBrowserFile> files = new List<IBrowserFile>();
     private string error;
 
     private async Task HandleValidSubmit()
     {
         using var context = ContextFactory.CreateDbContext();
         using var transaction = context.Database.BeginTransaction();
-
         try
         {
-            // Validate the user details
-            // ...
+            context.Persons.Add(person);
+            await context.SaveChangesAsync();
 
-            if (file != null)
+            foreach (var file in files)
             {
-                // Validate the file type
                 var allowedContentTypes = new[] { "image/jpeg", "image/jpg", "image/png", "application/pdf" };
                 if (!allowedContentTypes.Contains(file.ContentType))
                 {
                     error = "Nedozvoljena vrsta datoteke! Dozvoljene vrste datoteka su: jpeg, png i pdf.";
                     return;
                 }
-            }
 
-            // Save the new person to the database
-            context.Persons.Add(person);
-            await context.SaveChangesAsync();
-
-            if (file != null)
-            {
-                // Read the physical path from the appSettings.json file
                 var physicalPath = Configuration["AttachmentsPhysicalPath"];
-
-                // Build the directory path using the physical path and person ID
                 var directoryPath = Path.Combine(physicalPath, person.Id.ToString());
-
-                // Create the directory if it does not already exist
                 Directory.CreateDirectory(directoryPath);
-
-                // Build the file path using the directory path and file name
                 var filePath = Path.Combine(directoryPath, file.Name);
-
-                // Save the file to disk and create a new Attachment object
-                //var filePath = $"d:\\att\\{file.Name}";
-                var maxFileSize = 1024 * 1024 * 1024; //1MB
+                var maxFileSize = 1024 * 1024; //1MB
                 using var stream = System.IO.File.Create(filePath);
                 using var fileStream = file.OpenReadStream(maxFileSize);
                 await fileStream.CopyToAsync(stream);
-
                 var attachment = new Attachment
                     {
                         PersonId = person.Id,
                         FilePath = filePath
                     };
-
                 context.Attachments.Add(attachment);
-                await context.SaveChangesAsync();
             }
 
-            // Commit the transaction if there were no errors
+            await context.SaveChangesAsync();
             await transaction.CommitAsync();
-
             Navigation.NavigateTo("/");
         }
         catch (Exception ex)
         {
-            // Rollback the transaction if there were any errors
             await transaction.RollbackAsync();
-
             error = ex.Message;
         }
     }
 
     private void HandleFileSelected(InputFileChangeEventArgs e)
     {
-        file = e.File;
+        foreach (var file in e.GetMultipleFiles())
+        {
+            files.Add(file);
+        }
     }
 }
